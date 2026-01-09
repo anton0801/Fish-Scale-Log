@@ -225,7 +225,7 @@ struct SplashView: View {
                     Text("Loading...")
                         .font(.custom("BagelFatOne-Regular", size: 42))
                         .foregroundColor(.white)
-                        .padding(.bottom, 72)
+                        .padding(.bottom, !isLandscape ? 72 : 8)
                 }
                 
                 VStack {

@@ -88,7 +88,7 @@ class LogSupervisorViewModel: ObservableObject {
     }
     
     private func isOperationalPeriod() -> Bool {
-        let dateElements = DateComponents(year: 2026, month: 1, day: 9)
+        let dateElements = DateComponents(year: 2026, month: 1, day: 12)
         if let thresholdDate = Calendar.current.date(from: dateElements) {
             return Date() >= thresholdDate
         }
@@ -180,7 +180,9 @@ class LogSupervisorViewModel: ObservableObject {
     }
     
     private func designatePhase(_ phase: LogPhase) {
-        ongoingLogPhase = phase
+        DispatchQueue.main.async {
+            self.ongoingLogPhase = phase
+        }
     }
     
     private func acquireOrganicMetrics() async {
@@ -219,10 +221,14 @@ class LogSupervisorViewModel: ObservableObject {
                 let destStr = acquiredDest.absoluteString
                 self.endpointSaver.execute(destinationStr: destStr, resolvedDest: acquiredDest)
                 if self.consentChecker.execute() {
-                    self.logDestination = acquiredDest
-                    self.revealConsentDialog = true
+                    DispatchQueue.main.async {
+                        self.logDestination = acquiredDest
+                        self.revealConsentDialog = true
+                    }
                 } else {
-                    self.logDestination = acquiredDest
+                    DispatchQueue.main.async {
+                        self.logDestination = acquiredDest
+                    }
                     self.designatePhase(.operational)
                 }
             } catch {
