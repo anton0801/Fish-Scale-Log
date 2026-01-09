@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "fsl_icon.png",
+      "filename" : "scale_log_app_icon.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "fsl_icon 1.png",
+      "filename" : "scale_log_app_icon 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "fsl_icon 2.png",
+      "filename" : "scale_log_app_icon 2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
