@@ -452,6 +452,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow access to use your camera in this app.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We use your location to save logs about your fishing";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We use your location to save logs about your fishing";
 				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Fish Scale Log may collect limited technical information from your device to support app accuracy, improve stability, and refine functionality. This information is used only for internal evaluation and enhancement of the app. We do not use this data for cross-app tracking, user profiling, or third-party advertising.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -496,6 +497,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow access to use your camera in this app.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We use your location to save logs about your fishing";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We use your location to save logs about your fishing";
 				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Fish Scale Log may collect limited technical information from your device to support app accuracy, improve stability, and refine functionality. This information is used only for internal evaluation and enhancement of the app. We do not use this data for cross-app tracking, user profiling, or third-party advertising.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
