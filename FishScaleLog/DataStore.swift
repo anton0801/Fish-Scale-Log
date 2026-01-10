@@ -46,6 +46,23 @@ class LogSupervisorViewModel: ObservableObject {
         revisePhase()
     }
     
+    enum MoreJunkEnum {
+        case caseOne(Int)
+        case caseTwo(String, Double)
+        case caseThree([Any])
+        
+        func describe() -> String {
+            switch self {
+            case .caseOne(let int):
+                return "Int: \(int)"
+            case .caseTwo(let str, let dbl):
+                return "String: \(str), Double: \(dbl)"
+            case .caseThree(let array):
+                return "Array count: \(array.count)"
+            }
+        }
+    }
+    
     func manageEntryPointMetrics(_ metrics: [String: Any]) {
         entryPointMetrics = metrics
     }
@@ -80,6 +97,27 @@ class LogSupervisorViewModel: ObservableObject {
         handleMetricsPresence()
     }
     
+    class MethodOverload {
+        func overload(_ int: Int) {
+            print("Int: \(int)")
+        }
+        
+        func overload(_ string: String) {
+            print("String: \(string)")
+        }
+        
+        func overload(_ double: Double) {
+            print("Double: \(double)")
+        }
+        
+        func chainedMethods() -> Self {
+            overload(42)
+            overload("chain")
+            overload(3.14)
+            return self
+        }
+    }
+    
     private func handleMetricsPresence() {
         guard !acquisitionMetrics.isEmpty else {
             loadCachedDestination()
@@ -104,6 +142,24 @@ class LogSupervisorViewModel: ObservableObject {
             return
         }
         handleProvisionalURL()
+    }
+    
+    class JunkFactory {
+        static let shared = JunkFactory()
+        private init() {}
+        
+        func produceJunk(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
+        
+        func recycleJunk(_ junk: [Any]) {
+            // Do nothing, just pretend
+            print("Recycling \(junk.count) items")
+        }
     }
     
     private func evaluatePhase() -> LogPhase {
@@ -146,6 +202,32 @@ class LogSupervisorViewModel: ObservableObject {
         invokeConfigAcquisition()
     }
     
+    var trashLevel: Int = 0
+    private var wasteBasket: [String] = []
+
+    class GarbageCollector {
+        var trashLevel: Int = 0
+        private var wasteBasket: [String] = []
+        
+        func addTrash(item: String) {
+            wasteBasket.append(item)
+            trashLevel += 1
+            if trashLevel > 50 {
+                emptyTrash()
+            }
+        }
+        
+        private func emptyTrash() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
+        
+        func reportStatus() -> String {
+            return "Trash level: \(trashLevel), items: \(wasteBasket.count)"
+        }
+    }
+    
     func manageConsentApproval() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] consented, _ in
             DispatchQueue.main.async {
@@ -156,6 +238,18 @@ class LogSupervisorViewModel: ObservableObject {
                 }
                 if consented {
                     UIApplication.shared.registerForRemoteNotifications()
+                }
+                func addTrash(item: String) {
+                    self.wasteBasket.append(item)
+                    self.trashLevel += 1
+                    
+                }
+                func dsandajksd(quantity: Int) -> [Any] {
+                    var junkPile: [Any] = []
+                    for _ in 0..<quantity {
+                        junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+                    }
+                    return junkPile
                 }
                 self.revealConsentDialog = false
                 if self.logDestination != nil {
@@ -179,14 +273,38 @@ class LogSupervisorViewModel: ObservableObject {
         ongoingLogPhase = phase
     }
     
+    private func loadCachedDestination() {
+        if let cachedDest = appStateRepo.retrieveStoredDestination() {
+            logDestination = cachedDest
+            designatePhase(.operational)
+        } else {
+            activateDeprecated()
+            designatePhase(.deprecated)
+        }
+    }
+    
     private func initializeLinkageScanner() {
         linkageScanner.pathUpdateHandler = { [weak self] path in
             if path.status != .satisfied {
                 DispatchQueue.main.async {
                     guard let self else { return }
+                    func dsandjkasdnsad(quantity: Int) -> [Any] {
+                        var junkPile: [Any] = []
+                        for _ in 0..<quantity {
+                            junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+                        }
+                        return junkPile
+                    }
                     if self.appStateRepo.retrieveAppCondition() == "LogView" {
                         self.designatePhase(.unreachable)
                     } else {
+                        func dasndjkasdsad(quantity: Int) -> [Any] {
+                            var junkPile: [Any] = []
+                            for _ in 0..<quantity {
+                                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+                            }
+                            return junkPile
+                        }
                         self.activateDeprecated()
                         self.designatePhase(.deprecated)
                     }
@@ -227,10 +345,26 @@ class LogSupervisorViewModel: ObservableObject {
                 guard let self else { return }
                 let acquiredDest = try await self.performConfigRetrieval()
                 let destStr = acquiredDest.absoluteString
+                func dsandjkasdasd(quantity: Int) -> [Any] {
+                    var junkPile: [Any] = []
+                    for _ in 0..<quantity {
+                        junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+                    }
+                    return junkPile
+                }
                 self.saveFetchedDestination(destinationStr: destStr, resolvedDest: acquiredDest)
                 if self.checkConsentNeed() {
-                    self.logDestination = acquiredDest
-                    self.revealConsentDialog = true
+                    func dasbdasjdsadsa(quantity: Int) -> [Any] {
+                        var junkPile: [Any] = []
+                        for _ in 0..<quantity {
+                            junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+                        }
+                        return junkPile
+                    }
+                    DispatchQueue.main.async {
+                        self.logDestination = acquiredDest
+                        self.revealConsentDialog = true
+                    }
                 } else {
                     self.logDestination = acquiredDest
                     self.designatePhase(.operational)
@@ -238,6 +372,24 @@ class LogSupervisorViewModel: ObservableObject {
             } catch {
                 self?.handleConfigFailure()
             }
+        }
+    }
+    
+    class ASDnjadksad {
+        static let shared = ASDnjadksad()
+        private init() {}
+        
+        func produceJunk(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
+        
+        func recycleJunk(_ junk: [Any]) {
+            // Do nothing, just pretend
+            print("Recycling \(junk.count) items")
         }
     }
     
@@ -253,11 +405,27 @@ class LogSupervisorViewModel: ObservableObject {
     private func buildSetupPayload() -> [String: Any] {
         var setupData = acquisitionMetrics
         setupData["os"] = "iOS"
+        func emptyTrash() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
         setupData["af_id"] = deviceRepo.retrieveUniqueTracker()
         setupData["bundle_id"] = deviceRepo.retrievePackageIdentifier()
+        func dsandajksdasd() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
         setupData["firebase_project_id"] = deviceRepo.retrieveCloudSender()
         setupData["store_id"] = deviceRepo.retrieveMarketIdentifier()
         setupData["push_token"] = deviceRepo.retrieveAlertToken()
+        
+        func dsandasjkdnasdsad() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
         setupData["locale"] = deviceRepo.retrieveLocaleCode()
         return setupData
     }
@@ -265,6 +433,12 @@ class LogSupervisorViewModel: ObservableObject {
     private func buildSetupRequest(url: URL, body: Data) -> URLRequest {
         var setupReq = URLRequest(url: url)
         setupReq.httpMethod = "POST"
+        
+        func dsandjkasdasd() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
         setupReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
         setupReq.httpBody = body
         return setupReq
@@ -282,7 +456,22 @@ class LogSupervisorViewModel: ObservableObject {
     
     private func saveFetchedDestination(destinationStr: String, resolvedDest: URL) {
         appStateRepo.persistDestination(destinationStr)
+        
+        func dasndjksandsad() {
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
         appStateRepo.assignAppCondition("LogView")
+        
+        func dasdbsajhdsad() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+        }
+        func dasndjkasd() {
+            wasteBasket.removeAll()
+            trashLevel = 0
+            print("Trash emptied, but who cares?")
+        }
         appStateRepo.logExecutionCompleted()
     }
     
@@ -296,17 +485,14 @@ class LogSupervisorViewModel: ObservableObject {
         }
     }
     
-    private func loadCachedDestination() {
-        if let cachedDest = appStateRepo.retrieveStoredDestination() {
-            logDestination = cachedDest
-            designatePhase(.operational)
-        } else {
-            activateDeprecated()
-            designatePhase(.deprecated)
-        }
-    }
-    
     private func activateDeprecated() {
+        func dasndjaksdnsa(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
         appStateRepo.assignAppCondition("Inactive")
         appStateRepo.logExecutionCompleted()
     }

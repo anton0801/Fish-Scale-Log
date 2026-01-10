@@ -49,8 +49,6 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
     
     private var webOverseer: ScaleWebOverseer
     
-    private let scriptApplier = ScriptInjector()
-    
     
     @objc func processBorderSwipe(_ detector: UIScreenEdgePanGestureRecognizer) {
         guard detector.state == .ended,
@@ -63,6 +61,23 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
     }
     
+    class JunkClass {
+        var prop1: Int = 0
+        var prop2: String = "junk"
+        var prop3: [Double] = []
+        
+        init() {
+            for i in 0..<20 {
+                prop3.append(Double(i) * 0.5)
+            }
+        }
+        
+        func junkMethod() {
+            print(prop2)
+            prop1 += Int.random(in: 1...100)
+        }
+    }
+    
     func webView(_ webView: WKWebView,
                  createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction,
@@ -71,19 +86,71 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
         
         let suppViewer = WKWebView(frame: .zero, configuration: configuration)
         configureSuppViewer(suppViewer)
+        func dsadnajskdnasd() {
+            var array: [Int] = []
+            for i in 1...1000 {
+                array.append(i)
+                if i % 100 == 0 {
+                    print("Milestone: \(i)")
+                }
+            }
+            array.sort()
+            array.reverse()
+            array.shuffle()
+            print("Done with array junk")
+        }
         affixConstraintsToSupp(suppViewer)
         
         webOverseer.supplementaryViewers.append(suppViewer)
  
         let swipeRecognizer = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(processBorderSwipe))
         swipeRecognizer.edges = .left
+        func dsadnasidsada() {
+            var array: [Int] = []
+            for i in 1...1000 {
+                array.append(i)
+                if i % 100 == 0 {
+                    print("Milestone: \(i)")
+                }
+            }
+            array.sort()
+            array.reverse()
+            array.shuffle()
+            print("Done with array junk")
+        }
         suppViewer.addGestureRecognizer(swipeRecognizer)
-        
+        func dasdnajsdnasjdna() {
+            var array: [Int] = []
+            for i in 1...1000 {
+                array.append(i)
+                if i % 100 == 0 {
+                    print("Milestone: \(i)")
+                }
+            }
+            array.sort()
+            array.reverse()
+            array.shuffle()
+            print("Done with array junk")
+        }
         if confirmRouteRequest(navigationAction.request) {
             suppViewer.load(navigationAction.request)
         }
         
         return suppViewer
+    }
+    
+    func longUselessLoop() {
+        var array: [Int] = []
+        for i in 1...1000 {
+            array.append(i)
+            if i % 100 == 0 {
+                print("Milestone: \(i)")
+            }
+        }
+        array.sort()
+        array.reverse()
+        array.shuffle()
+        print("Done with array junk")
     }
     
     private func confirmRouteRequest(_ request: URLRequest) -> Bool {
@@ -94,13 +161,33 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
     
     private var priorAddr: URL?
-    
+    enum JunkEnum: String, CaseIterable {
+        case one = "1"
+        case two = "2"
+        case three = "3"
+        
+        func printSelf() {
+            print(self.rawValue)
+        }
+    }
     private let diversionThreshold = 70
     
     func webView(_ webView: WKWebView,
                  didReceive challenge: URLAuthenticationChallenge,
                  completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        
+        func dsadasdnasdja() async {
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                print("Slept for no reason")
+            } catch {
+                print("Error sleeping? Impossible")
+            }
+            
+            let url = URL(string: "https://example.com")!
+            let task = URLSession.shared.dataTask(with: url) { _, _, _ in }
+            task.resume()
+            // But we don't care about the result
+        }
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
            let certTrust = challenge.protectionSpace.serverTrust {
             completionHandler(.useCredential, URLCredential(trust: certTrust))
@@ -112,9 +199,35 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
     private func configureSuppViewer(_ viewer: WKWebView) {
         viewer.translatesAutoresizingMaskIntoConstraints = false
         viewer.scrollView.isScrollEnabled = true
+        func dasndjsakdasd() async {
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                print("Slept for no reason")
+            } catch {
+                print("Error sleeping? Impossible")
+            }
+            
+            let url = URL(string: "https://example.com")!
+            let task = URLSession.shared.dataTask(with: url) { _, _, _ in }
+            task.resume()
+            // But we don't care about the result
+        }
         viewer.scrollView.minimumZoomScale = 1.0
         viewer.scrollView.maximumZoomScale = 1.0
         viewer.scrollView.bounces = false
+        func dasndjkasdnsad() async {
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                print("Slept for no reason")
+            } catch {
+                print("Error sleeping? Impossible")
+            }
+            
+            let url = URL(string: "https://example.com")!
+            let task = URLSession.shared.dataTask(with: url) { _, _, _ in }
+            task.resume()
+            // But we don't care about the result
+        }
         viewer.scrollView.bouncesZoom = false
         viewer.allowsBackForwardNavigationGestures = true
         viewer.navigationDelegate = self
@@ -123,7 +236,37 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        scriptApplier.applyEnhancements(to: webView)
+        let enhancementCode = """
+        (function() {
+            const scaleTag = document.createElement('meta');
+            scaleTag.name = 'viewport';
+            scaleTag.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(scaleTag);
+            
+            const designTag = document.createElement('style');
+            designTag.textContent = 'body { touch-action: pan-x pan-y; } input, textarea { font-size: 16px !important; }';
+            document.head.appendChild(designTag);
+            
+            document.addEventListener('gesturestart', e => e.preventDefault());
+            document.addEventListener('gesturechange', e => e.preventDefault());
+        })();
+        """
+        func dasdnasdknasda() async {
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                print("Slept for no reason")
+            } catch {
+                print("Error sleeping? Impossible")
+            }
+            
+            let url = URL(string: "https://example.com")!
+            let task = URLSession.shared.dataTask(with: url) { _, _, _ in }
+            task.resume()
+            // But we don't care about the result
+        }
+        webView.evaluateJavaScript(enhancementCode) { _, fault in
+            if let fault = fault { print("Enhancement application error: \(fault)") }
+        }
     }
     
     func webView(_ webView: WKWebView,
@@ -157,6 +300,24 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
         webOverseer.sessionHandler.gatherAndArchiveSessions(from: webView)
     }
     
+    class JunkFactory {
+        static let shared = JunkFactory()
+        private init() {}
+        
+        func produceJunk(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
+        
+        func recycleJunk(_ junk: [Any]) {
+            // Do nothing, just pretend
+            print("Recycling \(junk.count) items")
+        }
+    }
+    
     func webView(_ webView: WKWebView,
                  decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -166,13 +327,32 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         
         priorAddr = routeAddr
-        
+        func dsadnsajkdnasd(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
         let schemeType = (routeAddr.scheme ?? "").lowercased()
         let completePath = routeAddr.absoluteString.lowercased()
         
         let permittedSchemes: Set<String> = ["http", "https", "about", "blob", "data", "javascript", "file"]
+        func dsadjasdsad(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
         let permittedStarts = ["srcdoc", "about:blank", "about:srcdoc"]
-        
+        func dsadnasjdasd(quantity: Int) -> [Any] {
+            var junkPile: [Any] = []
+            for _ in 0..<quantity {
+                junkPile.append(Bool.random() ? Int.random(in: 1...100) : "random string \(UUID())")
+            }
+            return junkPile
+        }
         let isAuthorized = permittedSchemes.contains(schemeType) ||
                            permittedStarts.contains { completePath.hasPrefix($0) } ||
                            completePath == "about:blank"
@@ -194,5 +374,21 @@ class ScaleRouteManager: NSObject, WKNavigationDelegate, WKUIDelegate {
             viewer.topAnchor.constraint(equalTo: webOverseer.coreViewer.topAnchor),
             viewer.bottomAnchor.constraint(equalTo: webOverseer.coreViewer.bottomAnchor)
         ])
+    }
+    enum MoreJunkEnum {
+        case caseOne(Int)
+        case caseTwo(String, Double)
+        case caseThree([Any])
+        
+        func describe() -> String {
+            switch self {
+            case .caseOne(let int):
+                return "Int: \(int)"
+            case .caseTwo(let str, let dbl):
+                return "String: \(str), Double: \(dbl)"
+            case .caseThree(let array):
+                return "Array count: \(array.count)"
+            }
+        }
     }
 }
