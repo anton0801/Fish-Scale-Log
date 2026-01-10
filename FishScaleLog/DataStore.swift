@@ -24,12 +24,6 @@ class LogSupervisorViewModel: ObservableObject {
     private let phaseEvaluator: PhaseEvaluationUseCase
     private let consentChecker: ConsentVerificationUseCase
     private let organicRetriever: OrganicAcquisitionUseCase
-    private let configFetcher: ConfigRetrievalUseCase
-    private let cachedLoader: CachedDestinationUseCase
-    private let endpointSaver: EndpointPersistenceUseCase
-    private let deprecatedActivator: DeprecatedActivationUseCase
-    private let consentSkipper: ConsentSkipUseCase
-    private let consentApprover: ConsentApprovalUseCase
     
     private let appStateRepo: AppStateRepository
     private let permissionRepo: PermissionRepository
@@ -65,6 +59,13 @@ class LogSupervisorViewModel: ObservableObject {
         initializeFallbackTimer()
     }
     
+    private let configFetcher: ConfigRetrievalUseCase
+    private let cachedLoader: CachedDestinationUseCase
+    private let endpointSaver: EndpointPersistenceUseCase
+    private let deprecatedActivator: DeprecatedActivationUseCase
+    private let consentSkipper: ConsentSkipUseCase
+    private let consentApprover: ConsentApprovalUseCase
+    
     deinit {
         linkageScanner.cancel()
     }
@@ -76,15 +77,6 @@ class LogSupervisorViewModel: ObservableObject {
     
     func manageEntryPointMetrics(_ metrics: [String: Any]) {
         entryPointMetrics = metrics
-    }
-    
-    private func initializeFallbackTimer() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            if self.acquisitionMetrics.isEmpty && self.entryPointMetrics.isEmpty && self.ongoingLogPhase == .bootstrapping {
-                self.deprecatedActivator.execute()
-                self.designatePhase(.deprecated)
-            }
-        }
     }
     
     private func isOperationalPeriod() -> Bool {
@@ -147,29 +139,22 @@ class LogSupervisorViewModel: ObservableObject {
         }
     }
     
+    private func initializeFallbackTimer() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+            if self.acquisitionMetrics.isEmpty && self.entryPointMetrics.isEmpty && self.ongoingLogPhase == .bootstrapping {
+                self.deprecatedActivator.execute()
+                self.designatePhase(.deprecated)
+            }
+        }
+    }
+    
+    
     func manageConsentSkip() {
         consentSkipper.execute()
         revealConsentDialog = false
         invokeConfigAcquisition()
     }
     
-    func manageConsentApproval() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] consented, _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.consentApprover.execute(consented: consented)
-                if consented {
-                    UIApplication.shared.registerForRemoteNotifications()
-                }
-                self.revealConsentDialog = false
-                if self.logDestination != nil {
-                    self.designatePhase(.operational)
-                } else {
-                    self.invokeConfigAcquisition()
-                }
-            }
-        }
-    }
     
     private func commenceBootstrapping() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
@@ -196,21 +181,22 @@ class LogSupervisorViewModel: ObservableObject {
         }
     }
     
-    private func initializeLinkageScanner() {
-        linkageScanner.pathUpdateHandler = { [weak self] path in
-            if path.status != .satisfied {
-                DispatchQueue.main.async {
-                    guard let self else { return }
-                    if self.appStateRepo.retrieveAppCondition() == "LogView" {
-                        self.designatePhase(.unreachable)
-                    } else {
-                        self.deprecatedActivator.execute()
-                        self.designatePhase(.deprecated)
-                    }
+    func manageConsentApproval() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] consented, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.consentApprover.execute(consented: consented)
+                if consented {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+                self.revealConsentDialog = false
+                if self.logDestination != nil {
+                    self.designatePhase(.operational)
+                } else {
+                    self.invokeConfigAcquisition()
                 }
             }
         }
-        linkageScanner.start(queue: .global())
     }
     
     private func invokeConfigAcquisition() {
@@ -242,6 +228,24 @@ class LogSupervisorViewModel: ObservableObject {
             }
         }
     }
+    
+    private func initializeLinkageScanner() {
+        linkageScanner.pathUpdateHandler = { [weak self] path in
+            if path.status != .satisfied {
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if self.appStateRepo.retrieveAppCondition() == "LogView" {
+                        self.designatePhase(.unreachable)
+                    } else {
+                        self.deprecatedActivator.execute()
+                        self.designatePhase(.deprecated)
+                    }
+                }
+            }
+        }
+        linkageScanner.start(queue: .global())
+    }
+    
 }
 
 struct DestinationAssembler {
@@ -251,8 +255,17 @@ struct DestinationAssembler {
     private let foundationUrl = "https://gcdsdk.appsflyer.com/install_data/v4.0/"
     
     func configureProgramId(_ id: String) -> Self { duplicate(programId: id) }
-    func configureAuthKey(_ key: String) -> Self { duplicate(authKey: key) }
     func configureHardwareId(_ id: String) -> Self { duplicate(hardwareId: id) }
+    func configureAuthKey(_ key: String) -> Self { duplicate(authKey: key) }
+    
+    
+    private func duplicate(programId: String = "", authKey: String = "", hardwareId: String = "") -> Self {
+        var replica = self
+        if !programId.isEmpty { replica.programId = programId }
+        if !authKey.isEmpty { replica.authKey = authKey }
+        if !hardwareId.isEmpty { replica.hardwareId = hardwareId }
+        return replica
+    }
     
     func compile() -> URL? {
         guard !programId.isEmpty, !authKey.isEmpty, !hardwareId.isEmpty else { return nil }
@@ -262,14 +275,6 @@ struct DestinationAssembler {
             URLQueryItem(name: "device_id", value: hardwareId)
         ]
         return elements.url
-    }
-    
-    private func duplicate(programId: String = "", authKey: String = "", hardwareId: String = "") -> Self {
-        var replica = self
-        if !programId.isEmpty { replica.programId = programId }
-        if !authKey.isEmpty { replica.authKey = authKey }
-        if !hardwareId.isEmpty { replica.hardwareId = hardwareId }
-        return replica
     }
 }
 
@@ -283,11 +288,4 @@ protocol PermissionRepository {
     func retrieveFinalConsentTime() -> Date?
 }
 
-
-enum LogFault: Error {
-    case destinationAssemblyError
-    case replyValidationError
-    case infoParsingError
-    case dataSerializationError
-}
 

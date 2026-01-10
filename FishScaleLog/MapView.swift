@@ -37,3 +37,25 @@ struct MapView: View {
 }
 
 
+struct NoConnectionView: View {
+    
+    var body: some View {
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            ZStack {
+                Image(isLandscape ? "connection_issue_second_bg" : "connection_issue_main_bg")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .ignoresSafeArea()
+                    .opacity(0.7)
+                
+                Image("connection_issue")
+                    .resizable()
+                    .frame(width: 300, height: 300)
+            }
+            
+        }
+        .ignoresSafeArea()
+    }
+}

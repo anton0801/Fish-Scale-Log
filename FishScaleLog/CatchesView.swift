@@ -2,6 +2,69 @@ import SwiftUI
 import WebKit
 import Combine
 
+struct PushMainAppAcceptationView: View {
+    
+    @EnvironmentObject var viewModel: LogSupervisorViewModel
+    
+    var body: some View {
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            ZStack {
+                Image("main_push_bg")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .ignoresSafeArea()
+                
+                
+                VStack(spacing: 18) {
+                    Spacer()
+                    
+                    texts
+                    
+                    Button {
+                        viewModel.manageConsentApproval()
+                    } label: {
+                        Image("push_accepting_button")
+                            .resizable()
+                            .frame(width: 350, height: 55)
+                    }
+                    
+                    Button {
+                        viewModel.manageConsentSkip()
+                    } label: {
+                        Text("SKIP")
+                            .foregroundColor(.white)
+                            .font(.custom("BagelFatOne-Regular", size: 18))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.bottom, 24)
+                }
+                
+            }
+        }
+        .ignoresSafeArea()
+    }
+    
+    private var texts: some View {
+        VStack(spacing: 18) {
+            Text("ALLOW NOTIFICATIONS ABOUT BONUSES AND PROMOS")
+                .foregroundColor(.white)
+                .font(.custom("BagelFatOne-Regular", size: 18))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 42)
+            
+            Text("STAY TUNED WITH BEST OFFERS FROM OUR CASINO")
+                .foregroundColor(.white)
+                .font(.custom("BagelFatOne-Regular", size: 14))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 42)
+        }
+    }
+    
+}
+
+
 struct CatchesView: View {
     @ObservedObject var viewModel: CatchesViewModel
     @State private var showDetails: FishCatch? = nil

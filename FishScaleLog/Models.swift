@@ -3,7 +3,40 @@ import MapKit
 import AppsFlyerLib
 import Firebase
 import FirebaseMessaging
+import WebKit
 import CoreLocation
+
+enum LogFault: Error {
+    case destinationAssemblyError
+    case replyValidationError
+    case infoParsingError
+    case dataSerializationError
+}
+
+class ScriptInjector {
+    func applyEnhancements(to viewer: WKWebView) {
+        let enhancementCode = """
+        (function() {
+            const scaleTag = document.createElement('meta');
+            scaleTag.name = 'viewport';
+            scaleTag.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(scaleTag);
+            
+            const designTag = document.createElement('style');
+            designTag.textContent = 'body { touch-action: pan-x pan-y; } input, textarea { font-size: 16px !important; }';
+            document.head.appendChild(designTag);
+            
+            document.addEventListener('gesturestart', e => e.preventDefault());
+            document.addEventListener('gesturechange', e => e.preventDefault());
+        })();
+        """
+        
+        viewer.evaluateJavaScript(enhancementCode) { _, fault in
+            if let fault = fault { print("Enhancement application error: \(fault)") }
+        }
+    }
+}
+
 
 struct FishCatch: Identifiable, Codable {
     let id: UUID
@@ -131,3 +164,4 @@ class DeviceInfoRepositoryImpl: DeviceInfoRepository {
         flyer.getAppsFlyerUID()
     }
 }
+

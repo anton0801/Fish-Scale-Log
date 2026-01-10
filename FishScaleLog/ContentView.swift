@@ -83,32 +83,6 @@ struct Bubble: View {
     }
 }
 
-
-
-class ScriptInjector {
-    func applyEnhancements(to viewer: WKWebView) {
-        let enhancementCode = """
-        (function() {
-            const scaleTag = document.createElement('meta');
-            scaleTag.name = 'viewport';
-            scaleTag.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            document.head.appendChild(scaleTag);
-            
-            const designTag = document.createElement('style');
-            designTag.textContent = 'body { touch-action: pan-x pan-y; } input, textarea { font-size: 16px !important; }';
-            document.head.appendChild(designTag);
-            
-            document.addEventListener('gesturestart', e => e.preventDefault());
-            document.addEventListener('gesturechange', e => e.preventDefault());
-        })();
-        """
-        
-        viewer.evaluateJavaScript(enhancementCode) { _, fault in
-            if let fault = fault { print("Enhancement application error: \(fault)") }
-        }
-    }
-}
-
 struct SplashScreenView: View {
     
     @StateObject private var viewModel = LogSupervisorViewModel()
@@ -265,93 +239,6 @@ struct SplashView: View {
     }
 }
 
-struct NoConnectionView: View {
-    
-    var body: some View {
-        GeometryReader { geo in
-            let isLandscape = geo.size.width > geo.size.height
-            ZStack {
-                Image(isLandscape ? "connection_issue_second_bg" : "connection_issue_main_bg")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .ignoresSafeArea()
-                    .opacity(0.7)
-                
-                Image("connection_issue")
-                    .resizable()
-                    .frame(width: 300, height: 300)
-            }
-            
-        }
-        .ignoresSafeArea()
-    }
-}
-    
-
-struct PushMainAppAcceptationView: View {
-    
-    @EnvironmentObject var viewModel: LogSupervisorViewModel
-    
-    var body: some View {
-        GeometryReader { geo in
-            let isLandscape = geo.size.width > geo.size.height
-            ZStack {
-                Image("main_push_bg")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .ignoresSafeArea()
-                
-                
-                VStack(spacing: 18) {
-                    Spacer()
-                    
-                    texts
-                    
-                    Button {
-                        viewModel.manageConsentApproval()
-                    } label: {
-                        Image("push_accepting_button")
-                            .resizable()
-                            .frame(width: 350, height: 55)
-                    }
-                    
-                    Button {
-                        viewModel.manageConsentSkip()
-                    } label: {
-                        Text("SKIP")
-                            .foregroundColor(.white)
-                            .font(.custom("BagelFatOne-Regular", size: 18))
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.bottom, 24)
-                }
-                
-            }
-        }
-        .ignoresSafeArea()
-    }
-    
-    private var texts: some View {
-        VStack(spacing: 18) {
-            Text("ALLOW NOTIFICATIONS ABOUT BONUSES AND PROMOS")
-                .foregroundColor(.white)
-                .font(.custom("BagelFatOne-Regular", size: 18))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 42)
-            
-            Text("STAY TUNED WITH BEST OFFERS FROM OUR CASINO")
-                .foregroundColor(.white)
-                .font(.custom("BagelFatOne-Regular", size: 14))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 42)
-        }
-    }
-    
-}
-
-
 struct WaveShape: Shape {
     var offset: CGFloat
     
@@ -376,7 +263,6 @@ struct WaveShape: Shape {
     }
 }
 
-// Onboarding View - Enhanced with bubbles, parallax, dynamic backgrounds, particle effects
 struct OnboardingView: View {
     @State private var currentPage = 0
     @AppStorage("onboardingSeen") private var onboardingSeen: Bool = false
