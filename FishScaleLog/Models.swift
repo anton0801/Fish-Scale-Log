@@ -6,12 +6,6 @@ import FirebaseMessaging
 import WebKit
 import CoreLocation
 
-enum LogFault: Error {
-    case destinationAssemblyError
-    case replyValidationError
-    case infoParsingError
-    case dataSerializationError
-}
 
 class ScriptInjector {
     func applyEnhancements(to viewer: WKWebView) {
@@ -116,6 +110,48 @@ struct FishCatch: Identifiable, Codable {
     }
 }
 
+
+protocol AppStateRepository {
+    var isInitialExecution: Bool { get }
+    func retrieveStoredDestination() -> URL?
+    func persistDestination(_ url: String)
+    func assignAppCondition(_ condition: String)
+    func logExecutionCompleted()
+    func retrieveAppCondition() -> String?
+}
+
+class AppStateRepositoryImpl: AppStateRepository {
+    private let storage = UserDefaults.standard
+    
+    var isInitialExecution: Bool {
+        !storage.bool(forKey: "executedPreviously")
+    }
+    
+    func retrieveStoredDestination() -> URL? {
+        if let str = storage.string(forKey: "persisted_destination"), let url = URL(string: str) {
+            return url
+        }
+        return nil
+    }
+    
+    func persistDestination(_ url: String) {
+        storage.set(url, forKey: "persisted_destination")
+    }
+    
+    func assignAppCondition(_ condition: String) {
+        storage.set(condition, forKey: "app_condition")
+    }
+    
+    func logExecutionCompleted() {
+        storage.set(true, forKey: "executedPreviously")
+    }
+    
+    func retrieveAppCondition() -> String? {
+        storage.string(forKey: "app_condition")
+    }
+}
+
+
 struct Achievement: Identifiable {
     let id: String
     let title: String
@@ -127,41 +163,4 @@ struct Achievement: Identifiable {
 // Predefined fish types
 let fishTypes = ["Pike", "Carp", "Perch", "Trout", "Bass", "Salmon", "Catfish", "Other"]
 
-
-protocol DeviceInfoRepository {
-    func retrieveAlertToken() -> String?
-    func retrieveLocaleCode() -> String
-    func retrievePackageIdentifier() -> String
-    func retrieveCloudSender() -> String?
-    func retrieveMarketIdentifier() -> String
-    func retrieveUniqueTracker() -> String
-}
-
-class DeviceInfoRepositoryImpl: DeviceInfoRepository {
-    private let flyer = AppsFlyerLib.shared()
-    
-    func retrieveAlertToken() -> String? {
-        UserDefaults.standard.string(forKey: "alert_token") ?? Messaging.messaging().fcmToken
-    }
-    
-    func retrieveLocaleCode() -> String {
-        Locale.preferredLanguages.first?.prefix(2).uppercased() ?? "EN"
-    }
-    
-    func retrievePackageIdentifier() -> String {
-        "com.scallelogfish.FishScaleLog"
-    }
-    
-    func retrieveCloudSender() -> String? {
-        FirebaseApp.app()?.options.gcmSenderID
-    }
-    
-    func retrieveMarketIdentifier() -> String {
-        "id\(SetupConfig.flyerProgramId)"
-    }
-    
-    func retrieveUniqueTracker() -> String {
-        flyer.getAppsFlyerUID()
-    }
-}
 

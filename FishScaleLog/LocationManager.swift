@@ -1,46 +1,9 @@
 import Foundation
 import MapKit
 import CoreLocation
-
-protocol AppStateRepository {
-    var isInitialExecution: Bool { get }
-    func retrieveStoredDestination() -> URL?
-    func persistDestination(_ url: String)
-    func assignAppCondition(_ condition: String)
-    func logExecutionCompleted()
-    func retrieveAppCondition() -> String?
-}
-
-class AppStateRepositoryImpl: AppStateRepository {
-    private let storage = UserDefaults.standard
-    
-    var isInitialExecution: Bool {
-        !storage.bool(forKey: "executedPreviously")
-    }
-    
-    func retrieveStoredDestination() -> URL? {
-        if let str = storage.string(forKey: "persisted_destination"), let url = URL(string: str) {
-            return url
-        }
-        return nil
-    }
-    
-    func persistDestination(_ url: String) {
-        storage.set(url, forKey: "persisted_destination")
-    }
-    
-    func assignAppCondition(_ condition: String) {
-        storage.set(condition, forKey: "app_condition")
-    }
-    
-    func logExecutionCompleted() {
-        storage.set(true, forKey: "executedPreviously")
-    }
-    
-    func retrieveAppCondition() -> String? {
-        storage.string(forKey: "app_condition")
-    }
-}
+import AppsFlyerLib
+import Firebase
+import FirebaseMessaging
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
@@ -77,6 +40,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 }
 
+
+protocol PermissionRepository {
+    func updateFinalConsentTime(_ time: Date)
+    func approveConsent(_ approved: Bool)
+    func declineConsent(_ declined: Bool)
+    func isConsentApproved() -> Bool
+    func isConsentDeclined() -> Bool
+    func retrieveFinalConsentTime() -> Date?
+}
+
 class PermissionRepositoryImpl: PermissionRepository {
     private let storage = UserDefaults.standard
     
@@ -105,49 +78,39 @@ class PermissionRepositoryImpl: PermissionRepository {
     }
 }
 
-struct PhaseEvaluationUseCase {
-    func execute(acquisitionMetrics: [String: Any], isInitial: Bool, provisionalUrl: String?) -> LogPhase {
-        if acquisitionMetrics.isEmpty {
-            return .deprecated
-        }
-        if UserDefaults.standard.string(forKey: "app_condition") == "Inactive" {
-            return .deprecated
-        }
-        if isInitial && (acquisitionMetrics["af_status"] as? String == "Organic") {
-            return .bootstrapping
-        }
-        if provisionalUrl != nil {
-            return .operational
-        }
-        return .bootstrapping
-    }
+protocol DeviceInfoRepository {
+    func retrieveAlertToken() -> String?
+    func retrieveLocaleCode() -> String
+    func retrievePackageIdentifier() -> String
+    func retrieveCloudSender() -> String?
+    func retrieveMarketIdentifier() -> String
+    func retrieveUniqueTracker() -> String
 }
 
-struct ConsentVerificationUseCase {
-    func execute() -> Bool {
-        let permissionRepo = PermissionRepositoryImpl()
-        guard !permissionRepo.isConsentApproved(), !permissionRepo.isConsentDeclined() else {
-            return false
-        }
-        if let prior = permissionRepo.retrieveFinalConsentTime(), Date().timeIntervalSince(prior) < 259200 {
-            return false
-        }
-        return true
+class DeviceInfoRepositoryImpl: DeviceInfoRepository {
+    private let flyer = AppsFlyerLib.shared()
+    
+    func retrieveAlertToken() -> String? {
+        UserDefaults.standard.string(forKey: "push_token") ?? Messaging.messaging().fcmToken
     }
-}
-
-struct PushDataExtractor {
-    func extract(info: [AnyHashable: Any]) -> String? {
-        var parsedLink: String?
-        if let link = info["url"] as? String {
-            parsedLink = link
-        } else if let subInfo = info["data"] as? [String: Any],
-                  let subLink = subInfo["url"] as? String {
-            parsedLink = subLink
-        }
-        if let activeLink = parsedLink {
-            return activeLink
-        }
-        return nil
+    
+    func retrieveLocaleCode() -> String {
+        Locale.preferredLanguages.first?.prefix(2).uppercased() ?? "EN"
+    }
+    
+    func retrievePackageIdentifier() -> String {
+        "com.scallelogfish.FishScaleLog"
+    }
+    
+    func retrieveCloudSender() -> String? {
+        FirebaseApp.app()?.options.gcmSenderID
+    }
+    
+    func retrieveMarketIdentifier() -> String {
+        "id\(SetupConfig.flyerProgramId)"
+    }
+    
+    func retrieveUniqueTracker() -> String {
+        flyer.getAppsFlyerUID()
     }
 }

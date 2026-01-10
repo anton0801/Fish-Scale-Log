@@ -2,39 +2,6 @@ import Foundation
 import SwiftUI
 
 
-struct ConfigRetrievalUseCase {
-    func execute(acquisitionMetrics: [String: Any]) async throws -> URL {
-        guard let setupDest = URL(string: "https://fishscalelog.com/config.php") else {
-            throw LogFault.destinationAssemblyError
-        }
-        let deviceRepo = DeviceInfoRepositoryImpl()
-        var setupData = acquisitionMetrics
-        setupData["os"] = "iOS"
-        setupData["af_id"] = deviceRepo.retrieveUniqueTracker()
-        setupData["bundle_id"] = deviceRepo.retrievePackageIdentifier()
-        setupData["firebase_project_id"] = deviceRepo.retrieveCloudSender()
-        setupData["store_id"] = deviceRepo.retrieveMarketIdentifier()
-        setupData["push_token"] = deviceRepo.retrieveAlertToken()
-        setupData["locale"] = deviceRepo.retrieveLocaleCode()
-        guard let setupBody = try? JSONSerialization.data(withJSONObject: setupData) else {
-            throw LogFault.dataSerializationError
-        }
-        var setupReq = URLRequest(url: setupDest)
-        setupReq.httpMethod = "POST"
-        setupReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        setupReq.httpBody = setupBody
-        let (info, _) = try await URLSession.shared.data(for: setupReq)
-        guard let parsed = try? JSONSerialization.jsonObject(with: info) as? [String: Any],
-              let valid = parsed["ok"] as? Bool, valid,
-              let destStr = parsed["url"] as? String,
-              let dest = URL(string: destStr) else {
-            throw LogFault.infoParsingError
-        }
-        return dest
-    }
-}
-
-
 class CatchesViewModel: ObservableObject {
     @AppStorage("catches") private var catchesData: Data = Data()
     @AppStorage("preferredUnit") var preferredUnit: String = "kg"
@@ -111,73 +78,5 @@ class CatchesViewModel: ObservableObject {
             Achievement(id: "diverse", title: "Diverse Angler", description: "Catch 5 different types", icon: "leaf.fill", unlocked: Set(catches.map { $0.fishType }).count >= 5)
         ]
         return ach
-    }
-}
-
-
-struct CachedDestinationUseCase {
-    func execute() -> URL? {
-        let appStateRepo = AppStateRepositoryImpl()
-        return appStateRepo.retrieveStoredDestination()
-    }
-}
-
-struct EndpointPersistenceUseCase {
-    func execute(destinationStr: String, resolvedDest: URL) {
-        let appStateRepo = AppStateRepositoryImpl()
-        appStateRepo.persistDestination(destinationStr)
-        appStateRepo.assignAppCondition("LogView")
-        appStateRepo.logExecutionCompleted()
-    }
-}
-
-struct DeprecatedActivationUseCase {
-    func execute() {
-        let appStateRepo = AppStateRepositoryImpl()
-        appStateRepo.assignAppCondition("Inactive")
-        appStateRepo.logExecutionCompleted()
-    }
-}
-
-struct ConsentSkipUseCase {
-    func execute() {
-        let permissionRepo = PermissionRepositoryImpl()
-        permissionRepo.updateFinalConsentTime(Date())
-    }
-}
-
-struct ConsentApprovalUseCase {
-    func execute(consented: Bool) {
-        let permissionRepo = PermissionRepositoryImpl()
-        permissionRepo.approveConsent(consented)
-        if !consented {
-            permissionRepo.declineConsent(true)
-        }
-    }
-}
-
-
-struct OrganicAcquisitionUseCase {
-    func execute(entryMetrics: [String: Any]) async throws -> [String: Any] {
-        let deviceRepo = DeviceInfoRepositoryImpl()
-        let assembler = DestinationAssembler()
-            .configureProgramId(SetupConfig.flyerProgramId)
-            .configureAuthKey(SetupConfig.flyerAuthKey)
-            .configureHardwareId(deviceRepo.retrieveUniqueTracker())
-        guard let attrDest = assembler.compile() else {
-            throw LogFault.destinationAssemblyError
-        }
-        let (info, reply) = try await URLSession.shared.data(from: attrDest)
-        guard let httpReply = reply as? HTTPURLResponse, httpReply.statusCode == 200 else {
-            throw LogFault.replyValidationError
-        }
-        guard let parsed = try? JSONSerialization.jsonObject(with: info) as? [String: Any] else {
-            throw LogFault.infoParsingError
-        }
-        var unified = parsed
-        for (k, v) in entryMetrics where unified[k] == nil {
-            unified[k] = v
-        }
-        return unified
     }
 }

@@ -8,7 +8,7 @@ import AppTrackingTransparency
 @main
 struct FishScaleLogApp: App {
     
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @UIApplicationDelegateAdaptor(ScaleLogAppDelegate.self) var appDelegate
     
     var body: some Scene {
         WindowGroup {
@@ -22,44 +22,31 @@ struct SetupConfig {
     static let flyerAuthKey = "XRAvU73MakDNxA4JFj6Wc7"
 }
 
-extension AppDelegate {
+struct DestinationAssembler {
+    private var programId = ""
+    private var authKey = ""
+    private var hardwareId = ""
+    private let foundationUrl = "https://gcdsdk.appsflyer.com/install_data/v4.0/"
     
-    func tokenUpdates(_ token: String) {
-        UserDefaults.standard.set(token, forKey: "fcm_token")
-        UserDefaults.standard.set(token, forKey: "push_token")
+    func configureProgramId(_ id: String) -> Self { duplicate(programId: id) }
+    func configureAuthKey(_ key: String) -> Self { duplicate(authKey: key) }
+    func configureHardwareId(_ id: String) -> Self { duplicate(hardwareId: id) }
+    
+    func compile() -> URL? {
+        guard !programId.isEmpty, !authKey.isEmpty, !hardwareId.isEmpty else { return nil }
+        var elements = URLComponents(string: foundationUrl + "id" + programId)!
+        elements.queryItems = [
+            URLQueryItem(name: "devkey", value: authKey),
+            URLQueryItem(name: "device_id", value: hardwareId)
+        ]
+        return elements.url
     }
     
-    func startAppDelegateUpdates() {
-        delegateAppScaleMergeTimer?.invalidate()
-        delegateAppScaleMergeTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
-            self?.sendAllCombinedData()
-        }
+    private func duplicate(programId: String = "", authKey: String = "", hardwareId: String = "") -> Self {
+        var replica = self
+        if !programId.isEmpty { replica.programId = programId }
+        if !authKey.isEmpty { replica.authKey = authKey }
+        if !hardwareId.isEmpty { replica.hardwareId = hardwareId }
+        return replica
     }
-    
-    func handleLaunchNotifications(launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
-        if let notificationInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
-            retriveNotificationNeededData(notificationInfo)
-        }
-    }
-    
-    func sendAllCombinedData() {
-        var mergedData = dataOfAppScaleLog
-        for (key, value) in scaleLogAppDeeps {
-            if mergedData[key] == nil {
-                mergedData[key] = value
-            }
-        }
-        sendData(data: mergedData)
-        UserDefaults.standard.set(true, forKey: timerScaleKey)
-    }
-    
-    
-    func sendData(data: [AnyHashable: Any]) {
-        NotificationCenter.default.post(
-            name: Notification.Name("ConversionDataReceived"),
-            object: nil,
-            userInfo: ["conversionData": data]
-        )
-    }
-    
 }
