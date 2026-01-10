@@ -1,42 +1,6 @@
 import SwiftUI
 import WebKit
-
-
-struct ScaleLogCentralView: View {
-    @State private var effectiveResourcePath: String? = ""
-    
-    var body: some View {
-        ZStack {
-            if let effectiveResourcePath = effectiveResourcePath, let resourceAddr = URL(string: effectiveResourcePath) {
-                ScaleWebEnclosure(resourceAddr: resourceAddr)
-                    .ignoresSafeArea(.keyboard, edges: .bottom)
-            }
-        }
-        .preferredColorScheme(.dark)
-        .onAppear(perform: establishPrimaryPath)
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("LoadTempURL"))) { _ in
-            refreshWithProvisionalPath()
-        }
-    }
-    
-    private func establishPrimaryPath() {
-        let provisionalPath = UserDefaults.standard.string(forKey: "temp_url")
-        let archivedPath = UserDefaults.standard.string(forKey: "persisted_destination") ?? ""
-        effectiveResourcePath = provisionalPath ?? archivedPath
-        
-        if provisionalPath != nil {
-            UserDefaults.standard.removeObject(forKey: "temp_url")
-        }
-    }
-    
-    private func refreshWithProvisionalPath() {
-        if let provisionalPath = UserDefaults.standard.string(forKey: "temp_url"), !provisionalPath.isEmpty {
-            effectiveResourcePath = nil
-            effectiveResourcePath = provisionalPath
-            UserDefaults.standard.removeObject(forKey: "temp_url")
-        }
-    }
-}
+import Combine
 
 struct ContentView: View {
     @AppStorage("onboardingSeen") private var onboardingSeen: Bool = false
@@ -104,7 +68,7 @@ struct SplashScreenView: View {
                     
                 case .operational:
                     if viewModel.logDestination != nil {
-                        ScaleLogCentralView()
+                        PrimaryResourceView()
                     } else {
                         ContentView()
                     }

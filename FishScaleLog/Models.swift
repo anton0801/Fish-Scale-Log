@@ -6,6 +6,16 @@ import FirebaseMessaging
 import WebKit
 import CoreLocation
 
+struct WebResource {
+    let address: URL
+}
+
+// Interactor
+protocol ResourceInteractorProtocol {
+    func retrieveStartupAddress() -> String?
+    func retrieveStoredAddress() -> String?
+    func eraseStartupAddress()
+}
 
 struct FishCatch: Identifiable, Codable {
     let id: UUID
@@ -83,6 +93,28 @@ struct FishCatch: Identifiable, Codable {
             try container.encode(coord.longitude, forKey: .longitude)
         }
     }
+}
+
+
+class ResourceInteractor: ResourceInteractorProtocol {
+    func retrieveStartupAddress() -> String? {
+        UserDefaults.standard.string(forKey: "temp_url")
+    }
+    
+    func retrieveStoredAddress() -> String? {
+        UserDefaults.standard.string(forKey: "persisted_destination")
+    }
+    
+    func eraseStartupAddress() {
+        UserDefaults.standard.removeObject(forKey: "temp_url")
+    }
+}
+
+// Presenter
+protocol ResourcePresenterProtocol: ObservableObject {
+    var activeResource: URL? { get set }
+    func initializeResource()
+    func updateResource()
 }
 
 

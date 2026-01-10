@@ -366,8 +366,10 @@ class LogSupervisorViewModel: ObservableObject {
                         self.revealConsentDialog = true
                     }
                 } else {
-                    self.logDestination = acquiredDest
-                    self.designatePhase(.operational)
+                    DispatchQueue.main.async {
+                        self.logDestination = acquiredDest
+                        self.designatePhase(.operational)
+                    }
                 }
             } catch {
                 self?.handleConfigFailure()
@@ -503,4 +505,16 @@ enum LogFault: Error {
     case replyValidationError
     case infoParsingError
     case dataSerializationError
+}
+
+
+// Router
+protocol ResourceRouterProtocol {
+    func launchExternalResource(_ address: URL)
+}
+
+class ResourceRouter: ResourceRouterProtocol {
+    func launchExternalResource(_ address: URL) {
+        UIApplication.shared.open(address, options: [:]) { _ in }
+    }
 }

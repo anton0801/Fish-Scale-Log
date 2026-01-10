@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import CoreLocation
+import WebKit
 
 struct MapView: View {
     @ObservedObject var viewModel: CatchesViewModel
@@ -57,5 +58,36 @@ struct NoConnectionView: View {
             
         }
         .ignoresSafeArea()
+    }
+}
+
+
+// Builder for WKWebView Settings
+class WebViewSettingsBuilder {
+    private let webView: WKWebView
+    
+    init(webView: WKWebView) {
+        self.webView = webView
+    }
+    
+    func disableZoom() -> Self {
+        webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.maximumZoomScale = 1.0
+        return self
+    }
+    
+    func disableBounces() -> Self {
+        webView.scrollView.bounces = false
+        webView.scrollView.bouncesZoom = false
+        return self
+    }
+    
+    func enableNavigationGestures() -> Self {
+        webView.allowsBackForwardNavigationGestures = true
+        return self
+    }
+    
+    func apply() {
+        // No return, just applies
     }
 }

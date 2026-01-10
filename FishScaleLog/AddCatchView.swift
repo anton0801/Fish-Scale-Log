@@ -138,36 +138,3 @@ struct AddCatchView: View {
     }
 }
 
-
-class SessionHandler {
-    func loadAndSetSessions() {
-        guard let archivedSessions = UserDefaults.standard.object(forKey: "archived_tokens") as? [String: [String: [HTTPCookiePropertyKey: AnyObject]]] else { return }
-        
-        let sessionStore = ScaleWebOverseer().coreViewer?.configuration.websiteDataStore.httpCookieStore
-        
-        let decodedSessions = archivedSessions.values.flatMap { $0.values }.compactMap { attrs in
-            HTTPCookie(properties: attrs as [HTTPCookiePropertyKey: Any])
-        }
-        
-        decodedSessions.forEach { session in
-            sessionStore?.setCookie(session)
-        }
-    }
-    
-    func gatherAndArchiveSessions(from viewer: WKWebView) {
-        viewer.configuration.websiteDataStore.httpCookieStore.getAllCookies { sessions in
-            var realmDict: [String: [String: [HTTPCookiePropertyKey: Any]]] = [:]
-            
-            for session in sessions {
-                var innerDict = realmDict[session.domain] ?? [:]
-                if let props = session.properties {
-                    innerDict[session.name] = props
-                }
-                realmDict[session.domain] = innerDict
-            }
-            
-            UserDefaults.standard.set(realmDict, forKey: "archived_tokens")
-        }
-    }
-}
-

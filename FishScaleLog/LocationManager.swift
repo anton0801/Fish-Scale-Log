@@ -2,8 +2,36 @@ import Foundation
 import MapKit
 import CoreLocation
 import AppsFlyerLib
+import WebKit
 import Firebase
 import FirebaseMessaging
+
+
+class CookieManager {
+    func fetchAndAssignCookies(to browser: WKWebView) {
+        guard let archivedCookies = UserDefaults.standard.object(forKey: "archived_cookies") as? [[HTTPCookiePropertyKey: Any]] else { return }
+        
+        let cookieRepository = browser.configuration.websiteDataStore.httpCookieStore
+        
+        let restoredCookies = archivedCookies.compactMap { attrs in
+            HTTPCookie(properties: attrs)
+        }
+        
+        for cookie in restoredCookies {
+            cookieRepository.setCookie(cookie)
+        }
+    }
+    
+    func collectAndPersistCookies(from browser: WKWebView) {
+        browser.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+            let cookieAttrs = cookies.compactMap { cookie in
+                cookie.properties
+            }
+            
+            UserDefaults.standard.set(cookieAttrs, forKey: "archived_cookies")
+        }
+    }
+}
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()

@@ -8,7 +8,6 @@ struct PushMainAppAcceptationView: View {
     
     var body: some View {
         GeometryReader { geo in
-            let isLandscape = geo.size.width > geo.size.height
             ZStack {
                 Image("main_push_bg")
                     .resizable()
@@ -131,27 +130,34 @@ struct CatchCard: View {
     }
 }
 
-struct ScaleWebEnclosure: UIViewRepresentable {
-    let resourceAddr: URL
+
+
+// Builder for WKWebViewConfiguration
+class WebConfigBuilder {
+    private var config = WKWebViewConfiguration()
     
-    @StateObject private var webOverseer = ScaleWebOverseer()
-    
-    func makeCoordinator() -> ScaleRouteManager {
-        ScaleRouteManager(overseer: webOverseer)
+    func enableInlinePlayback() -> Self {
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        return self
     }
     
-    func makeUIView(context: Context) -> WKWebView {
-        webOverseer.initCoreViewer()
-        webOverseer.coreViewer.uiDelegate = context.coordinator
-        webOverseer.coreViewer.navigationDelegate = context.coordinator
-        
-        webOverseer.sessionHandler.loadAndSetSessions()
-        webOverseer.coreViewer.load(URLRequest(url: resourceAddr))
-        
-        return webOverseer.coreViewer
+    func setPreferences(javaScriptEnabled: Bool = true, autoOpenWindows: Bool = true) -> Self {
+        let prefs = WKPreferences()
+        prefs.javaScriptEnabled = javaScriptEnabled
+        prefs.javaScriptCanOpenWindowsAutomatically = autoOpenWindows
+        config.preferences = prefs
+        return self
     }
     
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func setPagePreferences(allowJS: Bool = true) -> Self {
+        let pagePrefs = WKWebpagePreferences()
+        pagePrefs.allowsContentJavaScript = allowJS
+        config.defaultWebpagePreferences = pagePrefs
+        return self
+    }
+    
+    func build() -> WKWebViewConfiguration {
+        return config
+    }
 }
-
-

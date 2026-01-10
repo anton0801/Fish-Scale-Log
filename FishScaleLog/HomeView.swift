@@ -29,67 +29,6 @@ struct HomeView: View {
     }
 }
 
-
-class ScaleWebOverseer: ObservableObject {
-    @Published var coreViewer: WKWebView!
-    
-    private var monitors = Set<AnyCancellable>()
-    
-    func initCoreViewer() {
-        let viewerConfig = buildViewerConfig()
-        coreViewer = WKWebView(frame: .zero, configuration: viewerConfig)
-        adjustViewerSettings(on: coreViewer)
-    }
-    
-    private func buildViewerConfig() -> WKWebViewConfiguration {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        
-        let configPrefs = WKPreferences()
-        configPrefs.javaScriptEnabled = true
-        configPrefs.javaScriptCanOpenWindowsAutomatically = true
-        config.preferences = configPrefs
-        
-        let contentPrefs = WKWebpagePreferences()
-        contentPrefs.allowsContentJavaScript = true
-        config.defaultWebpagePreferences = contentPrefs
-        
-        return config
-    }
-    
-    private func adjustViewerSettings(on viewer: WKWebView) {
-        viewer.scrollView.minimumZoomScale = 1.0
-        viewer.scrollView.maximumZoomScale = 1.0
-        viewer.scrollView.bounces = false
-        viewer.scrollView.bouncesZoom = false
-        viewer.allowsBackForwardNavigationGestures = true
-    }
-    
-    @Published var supplementaryViewers: [WKWebView] = []
-    
-    let sessionHandler = SessionHandler()
-    
-    func retreatNavigation(to addr: URL? = nil) {
-        if !supplementaryViewers.isEmpty {
-            if let ultimateSupp = supplementaryViewers.last {
-                ultimateSupp.removeFromSuperview()
-                supplementaryViewers.removeLast()
-            }
-            
-            if let targetAddr = addr {
-                coreViewer.load(URLRequest(url: targetAddr))
-            }
-        } else if coreViewer.canGoBack {
-            coreViewer.goBack()
-        }
-    }
-    
-    func reinvigorateContent() {
-        coreViewer.reload()
-    }
-}
-
 struct OverviewCard: View {
     let title: String
     let value: String
